@@ -8,26 +8,24 @@ import json, pickle
 from collections import OrderedDict
 import argparse
 import helpers
-
-# Add short circuit if xml is not modified? There are no new, don't update cache
-# You can just go until get_output in separate threads, eliminating the
-# need for the get_xml function.  This will make things cleaner and less prone
-# to breaking.  Join the threads before you update the pickled caches.
+import logging
+import os.path
+from textwrap import dedent
 
 
 class Tuber:
 
-    output_template = '''
-{userhead}:
-{dash}
-{new_head}:
-------------
-{new_vids}
+    output_template = dedent('''
+    {userhead}:
+    {dash}
+    {new_head}:
+    ------------
+    {new_vids}
 
-{previous_head}:
---------------------
-{old_vids}
-'''
+    {previous_head}:
+    --------------------
+    {old_vids}
+    ''')
 
     def __init__(self, username, cached_videos, max_videos=50):
         self.username = username
@@ -41,12 +39,14 @@ class Tuber:
     def __repr__(self):
         return 'Tuber({!r})'.format(self.username)
 
-    def fetch_link(self, timeout):
+    def fetch_link(self, timeout=30):
+        logging.debug('fetching link for: ' + self.username)
         r = urllib.request.urlopen(self.link, timeout=timeout)
         xml = r.read()
         if r.status != 200:
             soup = BeautifulSoup(xml)
-            raise helpers.YouTubeAPIError(str(soup.errors.code.string))
+            raise helpers.YouTubeAPIError(soup.errors.code.text)
+        logging.debug('finished: ' + self.username)
         return xml
 
     def get_videos(self):
@@ -55,12 +55,12 @@ class Tuber:
         and a datetime object representing the published date.
         '''
         videos = OrderedDict()  # Videos will be ordered from more recent to less recent
-        soup = BeautifulSoup(self.xml)  # Set by get_xml function
+        soup = BeautifulSoup(self.fetch_link())
         entries = soup.find_all('entry')
         date_pattern = re.compile(r'(\d{4})-(\d{2})-(\d{2})')
         for e in entries:
-            ID, title = str(e.find('id').string), str(e.find('media:title').string)
-            xml_published = str(e.find('published').string)
+            ID, title = e.find('id').text, e.find('media:title').text
+            xml_published = e.find('published').text
             date_match = date_pattern.match(xml_published)
             date = datetime(*(int(x) for x in date_match.groups()))
             videos[ID] = helpers.Video(title, date)
@@ -71,7 +71,7 @@ class Tuber:
         not_seen = videos.keys() - self.cache.keys()
         new = [video for ID, video in videos.items() if ID in not_seen]
         old = [video for ID, video in self.cache.items()]
-        self.cache = videos  # Update the cache with new videos
+        self.cache = videos  # Update the cache
         return new, old
 
     def get_output(self, max_new, max_old):
@@ -85,7 +85,7 @@ class Tuber:
             newout += '\n\n... {} additional new videos hidden'.format(notdisplayed)
         newout_col = helpers.colorize(newout, helpers.colors.OKBLUE)
 
-        oldout = helpers.wrapp(old[:max_old])
+        oldout = helpers.wrapp(old[:max_old]) if len(old) != 0 else 'No previous videos'
         oldout_col = helpers.colorize(oldout, helpers.colors.FAIL)
 
         output = self.output_template.format(userhead=head,
@@ -97,35 +97,25 @@ class Tuber:
         return output
 
 
-def get_xml(tubers, workers, timeout):
-    '''Load in the xml attribute for each tuber.
-    No more requests need be made after this'''
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        print('Retrieving uploads...', file=sys.stderr)
-        future_to_tuber = {executor.submit(t.fetch_link, timeout): t for t in tubers}
-        for f in as_completed(future_to_tuber):
-            tuber = future_to_tuber[f]
-            try:
-                tuber.xml = f.result()
-            except Exception as e:
-                print('{} generated an exception: {}'.format(tuber, e), file=sys.stderr)
-                raise
-
-
-def export_caches(tubers):
+def export_caches(tubers, directory):
     caches = {t.username: t.cache for t in tubers}
-    with open('cache.p', 'wb') as pf:
+    with open(os.path.join(directory, 'cache.p'), 'wb') as pf:
         pickle.dump(caches, pf)
 
 
-def main(max_new, max_old, max_videos=50):
+def main(max_new, max_old, logger, max_videos=50):
+    if logger:
+        logging.basicConfig(level=logging.DEBUG)
+
+    directory = os.path.dirname(__file__)
+
     # Load in json formatted list of youtube usernames
-    with open('tubers.json') as j:
+    with open(os.path.join(directory, 'tubers.json')) as j:
         usernames = json.load(j)
 
     # Load in the caches
     try:
-        with open('cache.p', 'rb') as p:
+        with open(os.path.join(directory, 'cache.p'), 'rb') as p:
             caches = pickle.load(p)
     except (FileNotFoundError, EOFError):
         caches = {}
@@ -136,26 +126,23 @@ def main(max_new, max_old, max_videos=50):
         cache = caches.get(username, None)
         tubers.append(Tuber(username, cache, max_videos=max_videos))
 
+    # Get output concurrently
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        print('Retrieving uploads...', file=sys.stderr)
+        futures = [executor.submit(t.get_output, max_new, max_old) for t in tubers]
+        output = [f.result() for f in as_completed(futures)]
 
-
-    # Call get_xml to set xml attributes concurrently
-    threads = len(tubers) if len(tubers) <= 20 else 20
-    get_xml(tubers, workers=threads, timeout=30)
-    # helpers._fake_get_xml(tubers)
-
-    # Get output from each tuber
-    output = [t.get_output(max_new, max_old) for t in tubers]
+    # Print output
     print(*output, sep='\n')
 
     # Update caches for next time
-    export_caches(tubers)
+    export_caches(tubers, directory=directory)
 
 if __name__ == '__main__':
     desc = '''Fetches uploaded videos from youtube users
     specified in tubers.json. Displays new and previously checked videos.
-    Max videos is 50'''
-    epi = 'Author: Drew Quinn'
-    parser = argparse.ArgumentParser(description=desc, epilog=epi)
+    Will retrieve a maximum of 50 videos.'''
+    parser = argparse.ArgumentParser(description=desc)
     parser.add_argument('-n', '--max_new',
                         type=int,
                         default=50,
@@ -169,7 +156,11 @@ if __name__ == '__main__':
                         dest='max_old',
                         metavar='num_videos',
                         help='maximum previously checked videos to display')
+    parser.add_argument('--debug',
+                        action='store_true',
+                        dest='logger',
+                        help='turn on debugging information')
     args = parser.parse_args()
-    main(args.max_new, args.max_old)
+    main(args.max_new, args.max_old, args.logger)
 
 

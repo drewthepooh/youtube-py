@@ -32,9 +32,10 @@ def colorize(text, color):
 
 def display_date(d):
     now = datetime.datetime.now()
-    if d.day == now.day:
+    delta = now.date() - d.date()
+    if delta.days == 0:
         datestring = '      Today'
-    elif d.day == now.day - 1:
+    elif delta.days == 1:
         datestring = '  Yesterday'
     else:
         datestring = d.strftime('%a, %d %b')
