@@ -1,5 +1,5 @@
 import unittest
-from helpers import DateOrderedDict, Video
+from helpers import DateOrderedDict, Video, YouTubeAPIError
 from datetime import datetime
 import pickle
 import youtube
@@ -48,7 +48,7 @@ class TuberTest(unittest.TestCase):
             mock_urlresponse.status = 400
             mock_urlopen = MagicMock(return_value=mock_urlresponse)
             with patch('youtube.urllib.request.urlopen', new=mock_urlopen):
-                self.assertRaisesRegex(youtube.YouTubeAPIError,
+                self.assertRaisesRegex(YouTubeAPIError,
                                        'too_many_recent_calls',
                                        t.fetch_link, 30)
 

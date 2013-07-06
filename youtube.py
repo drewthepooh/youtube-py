@@ -6,19 +6,19 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json, pickle
 import urllib.request
-from helpers import DateOrderedDict, YouTubeAPIError, wrapp, Video
+import helpers
 
 
 class Tuber:
 
     output_template = '''
-{username} videos:
+{userhead}:
 {dash}
-NEW VIDEOS:
+{new_head}:
 ----------
 {new_vids}
 
-PREVIOUSLY CHECKED:
+{previous_head}:
 ------------------
 {old_vids}
 '''
@@ -27,7 +27,7 @@ PREVIOUSLY CHECKED:
         self.username = username
         self.max_videos = max_videos
         if cached_videos is None:
-            cached_videos = DateOrderedDict(maxitems=max_videos)
+            cached_videos = helpers.DateOrderedDict(maxitems=max_videos)
         self.cache = cached_videos
         self.link = ('https://gdata.youtube.com/feeds/api/users/{username}/uploads?'
                      'max-results={max}'.format(username=self.username, max=self.max_videos))
@@ -40,7 +40,7 @@ PREVIOUSLY CHECKED:
         xml = r.read()
         if r.status != 200:
             soup = BeautifulSoup(xml)
-            raise YouTubeAPIError(str(soup.errors.code.string))
+            raise helpers.YouTubeAPIError(str(soup.errors.code.string))
         return xml
 
     def get_videos(self):
@@ -57,7 +57,7 @@ PREVIOUSLY CHECKED:
             xml_published = str(e.find('published').string)
             date_match = date_pattern.match(xml_published)
             date = datetime(*(int(x) for x in date_match.groups()))
-            videos[ID] = Video(title, date)
+            videos[ID] = helpers.Video(title, date)
         return videos
 
     def update_cache(self):
@@ -72,12 +72,17 @@ PREVIOUSLY CHECKED:
 
     def get_output(self):
         new, old = self.update_cache()
-        newout = wrapp(new) if len(new) != 0 else 'No new videos'
-        oldout = wrapp(old[:8])  # A maximum of 10 old videos
-        output = self.output_template.format(username=self.username,
-                                             new_vids=newout,
-                                             old_vids=oldout,
-                                             dash='='* len(self.username + ' videos'))
+        head = helpers.colorize(self.username.upper() + ' VIDEOS', helpers.colors.HEADER)
+        newout = helpers.wrapp(new) if len(new) != 0 else 'No new videos'
+        newout_col = helpers.colorize(newout, helpers.colors.OKBLUE)
+        oldout = helpers.wrapp(old[:8])  # A maximum of 10 old videos
+        oldout_col = helpers.colorize(oldout, helpers.colors.FAIL)
+        output = self.output_template.format(userhead=head,
+                                             dash='='* len(head),
+                                             new_head='NEW VIDEOS',
+                                             previous_head='PREVIOUSLY CHECKED',
+                                             new_vids=newout_col,
+                                             old_vids=oldout_col)
         return output
 
 
