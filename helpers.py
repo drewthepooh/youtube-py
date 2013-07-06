@@ -31,27 +31,6 @@ def colorize(text, color):
     'helper function with outputs colored strings'
     return color + text + colors.ENDC
 
-class TuberCache(OrderedDict):
-
-    def __init__(self, data=None, maxitems=None):
-        self.maxitems = maxitems
-        super().__init__()
-        if data is not None:
-            self.update(data)
-
-    def check_items(self):
-        if self.maxitems is not None:
-            if len(self) > self.maxitems:
-                items_by_date = sorted(self.items(),
-                                       key=lambda item: item[1].published,
-                                       reverse=True)
-                while len(self) > self.maxitems:
-                    self.pop(items_by_date.pop()[0])
-
-    def update(self, new):
-        super().update(new)
-        self.check_items()
-
 
 def outer_wrap():
     'closure function so wrapp can use the same textwrapper instance'

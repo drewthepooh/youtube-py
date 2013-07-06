@@ -5,10 +5,11 @@ import re
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json, pickle
-import urllib.request
 import helpers
+from collections import OrderedDict
 
 # Add in ability to control output and other options from the commandline
+# Add short circuit if xml is not modified. There are no new, don't update cache
 
 class Tuber:
 
@@ -28,7 +29,7 @@ class Tuber:
         self.username = username
         self.max_videos = max_videos
         if cached_videos is None:
-            cached_videos = helpers.TuberCache(maxitems=max_videos)
+            cached_videos = OrderedDict()
         self.cache = cached_videos
         self.link = ('https://gdata.youtube.com/feeds/api/users/{username}/uploads?'
                      'max-results={max}'.format(username=self.username, max=self.max_videos))
@@ -49,7 +50,7 @@ class Tuber:
         Videos consist of the entry title,
         and a datetime object representing the published date.
         '''
-        videos = {}
+        videos = OrderedDict()  # Videos will be ordered from more recent to less recent
         soup = BeautifulSoup(self.xml)  # Set by get_xml function
         entries = soup.find_all('entry')
         date_pattern = re.compile(r'(\d{4})-(\d{2})-(\d{2})')
@@ -62,13 +63,11 @@ class Tuber:
         return videos
 
     def update_cache(self):
-        videos = self.get_videos()
+        videos = self.get_videos()  # Ordered dictionary of videos by date
         not_seen = videos.keys() - self.cache.keys()
-        new = sorted((video for ID, video in videos.items() if ID in not_seen),
-                     key=lambda v: v.published, reverse=True)
-        old = sorted((video for ID, video in self.cache.items()),
-                     key=lambda v: v.published, reverse=True)
-        self.cache.update(videos)
+        new = [video for ID, video in videos.items() if ID in not_seen]
+        old = [video for ID, video in self.cache.items()]
+        self.cache = videos  # Update the cache with new videos
         return new, old
 
     def get_output(self):
