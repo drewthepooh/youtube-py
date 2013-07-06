@@ -1,5 +1,4 @@
-from collections import OrderedDict, namedtuple
-import operator
+from collections import namedtuple
 import datetime
 import textwrap
 import shutil
@@ -31,13 +30,24 @@ def colorize(text, color):
     'helper function with outputs colored strings'
     return color + text + colors.ENDC
 
+def display_date(d):
+    now = datetime.datetime.now()
+    if d.day == now.day:
+        datestring = '      Today'
+    elif d.day == now.day - 1:
+        datestring = '  Yesterday'
+    else:
+        datestring = d.strftime('%a, %d %b')
+    return datestring
+
 
 def outer_wrap():
     'Forms a closure allowing wrapp to use a single textwrap instance.'
     columns = shutil.get_terminal_size().columns
     titles_width = int(columns*0.6)
     date_width = columns - titles_width - 10
-    wrapper = textwrap.TextWrapper(subsequent_indent=' '*9,
+    sub_indent = ' '*9
+    wrapper = textwrap.TextWrapper(subsequent_indent=sub_indent,
                                    width=titles_width,
                                    expand_tabs=True)
     def wrapp(videos):
@@ -45,7 +55,7 @@ def outer_wrap():
         entries = []
         for video in videos:
             title = video.title
-            date = 'date: ' + video.published.strftime('%a, %d %b')
+            date = display_date(video.published)
             lines = wrapper.wrap(video.title)
             lines[0] = '{:<{}} {:.>{}}   '.format(lines[0],
                                                  titles_width,
@@ -53,7 +63,7 @@ def outer_wrap():
                                                  date_width)
             string = '\n'.join(lines)
             string = textwrap.indent(string, ' --> ',
-                                     lambda line: not line.startswith(' '*9))
+                                     lambda line: not line.startswith(sub_indent))
             entries.append(string)
 
         return '\n'.join(entries)

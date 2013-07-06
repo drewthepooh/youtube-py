@@ -5,11 +5,15 @@ import re
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json, pickle
-import helpers
 from collections import OrderedDict
+import argparse
+import helpers
 
-# Add in ability to control output and other options from the commandline
-# Add short circuit if xml is not modified. There are no new, don't update cache
+# Add short circuit if xml is not modified? There are no new, don't update cache
+# You can just go until get_output in separate threads, eliminating the
+# need for the get_xml function.  This will make things cleaner and less prone
+# to breaking.  Join the threads before you update the pickled caches.
+
 
 class Tuber:
 
@@ -70,13 +74,20 @@ class Tuber:
         self.cache = videos  # Update the cache with new videos
         return new, old
 
-    def get_output(self):
+    def get_output(self, max_new, max_old):
         new, old = self.update_cache()
-        head = helpers.colorize(self.username.upper() + ' VIDEOS', helpers.colors.HEADER)
-        newout = helpers.wrapp(new) if len(new) != 0 else 'No new videos'
+        head = helpers.colorize(self.username.upper() + ' VIDEOS',
+                                helpers.colors.HEADER)
+
+        newout = helpers.wrapp(new[:max_new]) if len(new) != 0 else 'No new videos'
+        notdisplayed = len(new) - max_new
+        if notdisplayed > 0:
+            newout += '\n\n... {} additional new videos hidden'.format(notdisplayed)
         newout_col = helpers.colorize(newout, helpers.colors.OKBLUE)
-        oldout = helpers.wrapp(old[:8])  # A maximum of 8 old videos
+
+        oldout = helpers.wrapp(old[:max_old])
         oldout_col = helpers.colorize(oldout, helpers.colors.FAIL)
+
         output = self.output_template.format(userhead=head,
                                              dash='='* len(head),
                                              new_head='NEW VIDEOS',
@@ -107,7 +118,7 @@ def export_caches(tubers):
         pickle.dump(caches, pf)
 
 
-def main(max_videos=50):
+def main(max_new, max_old, max_videos=50):
     # Load in json formatted list of youtube usernames
     with open('tubers.json') as j:
         usernames = json.load(j)
@@ -125,19 +136,40 @@ def main(max_videos=50):
         cache = caches.get(username, None)
         tubers.append(Tuber(username, cache, max_videos=max_videos))
 
+
+
     # Call get_xml to set xml attributes concurrently
     threads = len(tubers) if len(tubers) <= 20 else 20
     get_xml(tubers, workers=threads, timeout=30)
     # helpers._fake_get_xml(tubers)
 
     # Get output from each tuber
-    output = [t.get_output() for t in tubers]
+    output = [t.get_output(max_new, max_old) for t in tubers]
     print(*output, sep='\n')
 
     # Update caches for next time
     export_caches(tubers)
 
 if __name__ == '__main__':
-    main()
+    desc = '''Fetches uploaded videos from youtube users
+    specified in tubers.json. Displays new and previously checked videos.
+    Max videos is 50'''
+    epi = 'Author: Drew Quinn'
+    parser = argparse.ArgumentParser(description=desc, epilog=epi)
+    parser.add_argument('-n', '--max_new',
+                        type=int,
+                        default=50,
+                        dest='max_new',
+                        metavar='num_videos',
+                        help='maximum new videos to display')
+    parser.add_argument('-o',
+                        '--max_old',
+                        type=int,
+                        default=5,
+                        dest='max_old',
+                        metavar='num_videos',
+                        help='maximum previously checked videos to display')
+    args = parser.parse_args()
+    main(args.max_new, args.max_old)
 
 

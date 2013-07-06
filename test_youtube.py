@@ -1,5 +1,5 @@
 import unittest
-from helpers import TuberCache, Video, YouTubeAPIError
+from helpers import Video, YouTubeAPIError
 from datetime import datetime
 import pickle
 import youtube
