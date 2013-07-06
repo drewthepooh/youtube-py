@@ -1,5 +1,4 @@
-from helpers import *  # Get rid of this
-from pprint import pprint
+from helpers import DateOrderedDict, YouTubeAPIError, wrapp
 from datetime import datetime
 import sys
 from bs4 import BeautifulSoup
@@ -25,7 +24,7 @@ class Tuber:
 
     def fetch_link(self, timeout):
         r = urllib.request.urlopen(self.link, timeout=timeout)
-        soup = r.read()
+        soup = BeautifulSoup(r.read())
         if soup.find('errors'):
             raise YouTubeAPIError(str(soup.errors.code.string))
         return soup
@@ -59,10 +58,8 @@ class Tuber:
 
     def get_output(self):
         new, old = self.update_cache()
-        newheader = colorize('NEW VIDEOS', colors.HEADER)
-        oldheader = colorize('OLD VIDEOS', colors.HEADER)
-        newout = colorize(wrapp(new), colors.OKBLUE)
-        oldout = colorize(wrapp(old[:10]), colors.FAIL)  # A maximum of 10 old videos
+        newout = wrapp(new)
+        oldout = wrapp(old[:10])  # A maximum of 10 old videos
         output = '''
 {username} videos:
 {dash}
