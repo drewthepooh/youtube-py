@@ -8,6 +8,7 @@ import json, pickle
 import urllib.request
 import helpers
 
+# Add in ability to control output and other options from the commandline
 
 class Tuber:
 
@@ -27,7 +28,7 @@ class Tuber:
         self.username = username
         self.max_videos = max_videos
         if cached_videos is None:
-            cached_videos = helpers.DateOrderedDict(maxitems=max_videos)
+            cached_videos = helpers.TuberCache(maxitems=max_videos)
         self.cache = cached_videos
         self.link = ('https://gdata.youtube.com/feeds/api/users/{username}/uploads?'
                      'max-results={max}'.format(username=self.username, max=self.max_videos))
@@ -49,7 +50,7 @@ class Tuber:
         and a datetime object representing the published date.
         '''
         videos = {}
-        soup = BeautifulSoup(self.xml)
+        soup = BeautifulSoup(self.xml)  # Set by get_xml function
         entries = soup.find_all('entry')
         date_pattern = re.compile(r'(\d{4})-(\d{2})-(\d{2})')
         for e in entries:

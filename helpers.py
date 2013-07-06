@@ -31,7 +31,7 @@ def colorize(text, color):
     'helper function with outputs colored strings'
     return color + text + colors.ENDC
 
-class DateOrderedDict(OrderedDict):
+class TuberCache(OrderedDict):
 
     def __init__(self, data=None, maxitems=None):
         self.maxitems = maxitems

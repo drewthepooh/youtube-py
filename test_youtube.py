@@ -1,5 +1,5 @@
 import unittest
-from helpers import DateOrderedDict, Video, YouTubeAPIError
+from helpers import TuberCache, Video, YouTubeAPIError
 from datetime import datetime
 import pickle
 import youtube
@@ -22,7 +22,7 @@ class DateOrderedTest(unittest.TestCase):
 
 
     def test_init(self):
-        do = DateOrderedDict(self.videos, maxitems=3)
+        do = TuberCache(self.videos, maxitems=3)
         self.assertTrue(len(do) == 3)
         dates = [video.published for video in do.values()]
         self.assertTrue(datetime(2012, 9, 2) in dates and
@@ -30,7 +30,7 @@ class DateOrderedTest(unittest.TestCase):
                         datetime(2012, 6, 13) in dates)
 
     def test_update(self):
-        do = DateOrderedDict(self.videos, maxitems=3)
+        do = TuberCache(self.videos, maxitems=3)
         do.update(self.more_videos)
         self.assertTrue(len(do) == 3)
         dates = [video.published for video in do.values()]
