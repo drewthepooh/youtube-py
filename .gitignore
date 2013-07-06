@@ -1,0 +1,5 @@
+__pycache__
+*.p
+.DS_Store
+jsmith.xml
+ohm_xml.xml

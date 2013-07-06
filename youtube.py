@@ -17,11 +17,11 @@ class Tuber:
 {userhead}:
 {dash}
 {new_head}:
-----------
+------------
 {new_vids}
 
 {previous_head}:
-------------------
+--------------------
 {old_vids}
 '''
 
@@ -75,7 +75,7 @@ class Tuber:
         head = helpers.colorize(self.username.upper() + ' VIDEOS', helpers.colors.HEADER)
         newout = helpers.wrapp(new) if len(new) != 0 else 'No new videos'
         newout_col = helpers.colorize(newout, helpers.colors.OKBLUE)
-        oldout = helpers.wrapp(old[:8])  # A maximum of 10 old videos
+        oldout = helpers.wrapp(old[:8])  # A maximum of 8 old videos
         oldout_col = helpers.colorize(oldout, helpers.colors.FAIL)
         output = self.output_template.format(userhead=head,
                                              dash='='* len(head),
@@ -101,17 +101,10 @@ def get_xml(tubers, workers, timeout):
                 raise
 
 
-def _fake_get_xml(tubers):
-    '''Purely for testing. Will move later'''
-    with open('jsmith.xml') as jxml, open('ohm_xml.xml') as oxml:
-        tubers[0].xml = oxml.read()
-        tubers[1].xml = jxml.read()
-
-
 def export_caches(tubers):
-    new_cache = {t.username: t.cache for t in tubers}
+    caches = {t.username: t.cache for t in tubers}
     with open('cache.p', 'wb') as pf:
-        pickle.dump(new_cache, pf)
+        pickle.dump(caches, pf)
 
 
 def main(max_videos=50):
@@ -135,7 +128,7 @@ def main(max_videos=50):
     # Call get_xml to set xml attributes concurrently
     threads = len(tubers) if len(tubers) <= 20 else 20
     get_xml(tubers, workers=threads, timeout=30)
-    # _fake_get_xml(tubers)
+    # helpers._fake_get_xml(tubers)
 
     # Get output from each tuber
     output = [t.get_output() for t in tubers]

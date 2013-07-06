@@ -33,7 +33,7 @@ def colorize(text, color):
 
 
 def outer_wrap():
-    'closure function so wrapp can use the same textwrapper instance'
+    'Forms a closure allowing wrapp to use a single textwrap instance.'
     columns = shutil.get_terminal_size().columns
     titles_width = int(columns*0.6)
     date_width = columns - titles_width - 10
@@ -41,7 +41,7 @@ def outer_wrap():
                                    width=titles_width,
                                    expand_tabs=True)
     def wrapp(videos):
-        'helper function which formats videos correctly for output'
+        'Formats videos for output.'
         entries = []
         for video in videos:
             title = video.title
@@ -61,3 +61,9 @@ def outer_wrap():
     return wrapp
 
 wrapp = outer_wrap()
+
+def _fake_get_xml(tubers):
+    '''Purely for testing. Will remove later'''
+    with open('jsmith.xml') as jxml, open('ohm_xml.xml') as oxml:
+        tubers[0].xml = oxml.read()
+        tubers[1].xml = jxml.read()
