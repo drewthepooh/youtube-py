@@ -43,7 +43,10 @@ class TuberTest(unittest.TestCase):
     def test_handle_API_errors(self):
         t = youtube.Tuber(None, None)
         with open('errors_sample.xml') as xml:
-            mock_urlopen = MagicMock(return_value=xml)
+            mock_urlresponse = MagicMock()
+            mock_urlresponse.read = xml.read
+            mock_urlresponse.status = 400
+            mock_urlopen = MagicMock(return_value=mock_urlresponse)
             with patch('youtube.urllib.request.urlopen', new=mock_urlopen):
                 self.assertRaisesRegex(youtube.YouTubeAPIError,
                                        'too_many_recent_calls',

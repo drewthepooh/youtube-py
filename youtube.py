@@ -1,4 +1,3 @@
-from helpers import DateOrderedDict, YouTubeAPIError, wrapp
 from datetime import datetime
 import sys
 from bs4 import BeautifulSoup
@@ -7,9 +6,23 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json, pickle
 import urllib.request
+from helpers import DateOrderedDict, YouTubeAPIError, wrapp, Video
 
 
 class Tuber:
+
+    output_template = '''
+{username} videos:
+{dash}
+NEW VIDEOS:
+----------
+{new_vids}
+
+PREVIOUSLY CHECKED:
+------------------
+{old_vids}
+'''
+
     def __init__(self, username, cached_videos, max_videos=50):
         self.username = username
         self.max_videos = max_videos
@@ -24,10 +37,11 @@ class Tuber:
 
     def fetch_link(self, timeout):
         r = urllib.request.urlopen(self.link, timeout=timeout)
-        soup = BeautifulSoup(r.read())
-        if soup.find('errors'):
+        xml = r.read()
+        if r.status != 200:
+            soup = BeautifulSoup(xml)
             raise YouTubeAPIError(str(soup.errors.code.string))
-        return soup
+        return xml
 
     def get_videos(self):
         '''Returns videos given an xml page from google's youtube API.
@@ -35,7 +49,7 @@ class Tuber:
         and a datetime object representing the published date.
         '''
         videos = {}
-        soup = self.xmlsoup
+        soup = BeautifulSoup(self.xml)
         entries = soup.find_all('entry')
         date_pattern = re.compile(r'(\d{4})-(\d{2})-(\d{2})')
         for e in entries:
@@ -58,20 +72,12 @@ class Tuber:
 
     def get_output(self):
         new, old = self.update_cache()
-        newout = wrapp(new)
-        oldout = wrapp(old[:10])  # A maximum of 10 old videos
-        output = '''
-{username} videos:
-{dash}
-NEW VIDEOS:
-----------
-{new_vids}
-
-PREVIOUSLY CHECKED:
-------------------
-{old_vids}
-'''.format(username=self.username, new_vids=newout, old_vids=oldout,
-           dash='='* len(self.username + ' videos'))
+        newout = wrapp(new) if len(new) != 0 else 'No new videos'
+        oldout = wrapp(old[:8])  # A maximum of 10 old videos
+        output = self.output_template.format(username=self.username,
+                                             new_vids=newout,
+                                             old_vids=oldout,
+                                             dash='='* len(self.username + ' videos'))
         return output
 
 
@@ -84,14 +90,14 @@ def get_xml(tubers, workers, timeout):
         for f in as_completed(future_to_tuber):
             tuber = future_to_tuber[f]
             try:
-                tuber.xmlsoup = f.result()
+                tuber.xml = f.result()
             except Exception as e:
                 print('{} generated an exception: {}'.format(tuber, e), file=sys.stderr)
                 raise
 
 
 def _fake_get_xml(tubers):
-    '''Purely for testing'''
+    '''Purely for testing. Will move later'''
     with open('jsmith.xml') as jxml, open('ohm_xml.xml') as oxml:
         tubers[0].xml = oxml.read()
         tubers[1].xml = jxml.read()

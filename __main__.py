@@ -8,5 +8,3 @@ if __name__ == '__main__':
     youtube.wait()
     less.wait()
 
-    print('done')
-
